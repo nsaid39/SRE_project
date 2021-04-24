@@ -1,0 +1,140 @@
+#! /bin/bash
+#change hostname
+HOSTNAME(){
+read -p "hostname? " hn
+echo "$hn" | sudo tee /etc/hostname
+}
+
+
+#Alpine update & upgrade
+AR_NEW_ROOT(){
+apk update
+apk upgrade
+}
+AR_NEW_NO_ROOT(){
+sudo apk update
+sudo apk upgrade
+}
+
+AR_APK(){
+apk add nano sudo bash procps tree wget iptables
+}
+
+AR_ADDUSER(){
+read -p "username? " user
+sudo adduser -s /bin/bash -h /home/$user -D $user
+echo -e "$user\n$user\n" | sudo passwd $user
+sudo addgroup $user wheel
+}
+AR_SUDOERS(){
+sudo u+w /etc/sudoers
+echo '%wheel ALL=(ALL) ALL
+%sudo ALL=(ALL) ALL' | sudo tee -a /etc/sudoers
+}
+
+#Alpine IP
+AR_IP(){
+read -p 'eth0 IP: ' ip1
+read -p 'eth0 netmask: ' mask1
+read -p 'Gateway: ' gw
+
+read -p 'eth1 IP: ' ip2
+read -p 'eth1 netmask: ' mask2
+
+echo "
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+	address $ip1
+	netmask $mask1
+	gateway $gw
+auto eth1
+iface eth1 inet static
+	address $ip2
+	netmask $mask2
+" | sudo tee /etc/network/interfaces
+}
+
+
+#turn ip_forward on forever
+IP_FORWARD(){
+echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
+}
+
+#Alpine routing table
+AR_ROUTE_SET(){
+echo "This is Alpine."
+read -p "network ID: " netID
+read -p "netmask: " mask
+read -p "gw: " gw
+echo "#!/bin/bash
+route add -net $netID netmask $mask gw $gw" | sudo tee -a /etc/local.d/route_set.start
+sleep 1
+sudo rc-update add local
+}
+
+
+
+
+
+#Ubuntu ip
+US_IP(){
+echo "This is Ubuntu."
+#Second ens
+ens1=$(ifconfig -a | grep ens | tail -n 1 | cut -d ' ' -f1 | cut -d ':' -f1)
+cd /etc/netplan
+read -e -p  "filename? " file
+
+read -p "Bridge IP: " ip0
+read -p "Bridge netmask,how many '1'?: " one0
+read -p "gw: " gw
+
+read -p "NAT IP: " ip1
+read -p "NAT netmask,how many '1'?: " one1
+
+echo "
+network:
+  ethernets:
+    ens32:
+      dhcp4: no
+      addresses: [ $ip0/$one0 ]
+      gateway4: $gw
+    $ens1:
+      dhcp4: no
+      addresses: [ $ip1/$one1 ]
+
+" | sudo tee /etc/netplan/$file
+sudo netplan apply
+cd
+}
+
+#Ubuntu routing table
+US_ROUTE_SET(){
+echo "this is Ubuntu."
+read -p "network ID: " unetID
+read -p "netmask: " mask
+read -p "gw: " gw
+echo "#! /bin/bash
+route add -net $netID netmask $mask gw $gw
+" | sudo tee /etc/rc.local
+sudo chmod +x /etc/rc.local
+}
+
+
+PROFILE(){
+echo "
+gw=$(route -n | grep -e "^0.0.0.0 ")
+export GWIF=${gw##* }
+ips=$(ifconfig $GWIF | grep 'inet ')
+export IP=$(echo $ips | cut -d' ' -f2 | cut -d':' -f2)
+export NETID=$(route -n | grep " U " | grep $GWIF | cut -d ' ' -f1)
+export GW=$(route -n | grep -e '^0.0.0.0' | tr -s \ - | cut -d ' ' -f2)
+alias ping='ping -c 4 '
+alias dir='ls -alh '
+alias poweroff='sudo poweroff; sleep 5'
+alias reboot='sudo reboot; sleep 5'
+alias ps='ps -eo user,pid,cmd,%mem,%cpu'
+" | sudo tee -a /etc/profile
+}
