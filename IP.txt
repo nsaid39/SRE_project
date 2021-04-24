@@ -1,0 +1,19 @@
+#! /bin/sh
+echo "
+auto lo
+
+" | tee /sdglkfdj
+
+
+n=$(ls /sys/class/net)
+for x in $n
+do
+ #echo -n "$x "
+ if [ $x != "lo" ];then
+  ips=$(ifconfig $x | grep "inet ")
+  IP=$(echo $ips | cut -d " " -f2 | cut -d ":" -f1)
+  echo "$x:$IP"
+ fi
+
+done
+echo
