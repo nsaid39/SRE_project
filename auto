@@ -27,7 +27,7 @@ echo -e "$user\n$user\n" | sudo passwd $user
 sudo addgroup $user wheel
 }
 AR_SUDOERS(){
-sudo u+w /etc/sudoers
+sudo chmod u+w /etc/sudoers
 echo '%wheel ALL=(ALL) ALL
 %sudo ALL=(ALL) ALL' | sudo tee -a /etc/sudoers
 }
