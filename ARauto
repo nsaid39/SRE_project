@@ -1,13 +1,11 @@
 #! /bin/sh
-UPDATE(){
-apk update
-}
 
 UPGRADE(){
+apk update
 apk upgrade
 }
 
-INSTALL(){
+APK(){
 apk add nano tree bash net-tools iptables wget curl procps zip unzip sudo grep
 }
 
@@ -19,9 +17,9 @@ echo -e "$user\n$user\n" | passwd $username
 addgroup $username wheel
 chmod 640 /etc/sudoers
 echo '
-%wheel ALL=(ALL) ALL
-%sudo ALL=(ALL) ALL
-' | sudo tee -a /etc/sudoers
+%wheel ALL=(ALL) NOPASSWD: ALL
+' | tee -a /etc/sudoers
+#nano /etc/sudoers
 }
 
 IPFORWARD(){
@@ -42,7 +40,7 @@ alias ps='ps aux'
 clear
 
 ./ip
-
+. ARauto
 ' | tee -a /etc/sudoers
 }
 
@@ -54,7 +52,16 @@ tty1::respawn:/sbin/agetty --autologin $username --noclear 38400 tty1
 nano /etc/inittab
 }
 
-#poweroff©
+setup-0(){
+UPGRADE
+APK
+ADDUSER
+IPFORWARD
+PROFILE
+AUTOLOGIN
+}
+
+#poweroff-----------------------------------
 
 HOST(){
 read -p "Enter hostname: " hostname
@@ -143,4 +150,24 @@ sudo apk add squid
 sudo rc-service squid start
 
 sudo rc-update add squid
+}
+
+
+setup-p1(){
+HOST
+ADDIP
+ADDROUTE
+CHROUTE
+PROXY
+}
+
+setup-r(){
+echo "set hostname: "
+HOST
+echo "set IP: "
+ADDIP
+echo "set routing table: "
+ADDROUTE
+echo "chmod route_set.start"
+CHROUTE
 }
