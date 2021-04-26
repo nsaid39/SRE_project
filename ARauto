@@ -13,7 +13,7 @@ ADDUSER(){
 export username
 read -p "Type a username you want to add: " username
 adduser -s /bin/bash -h /home/$username -D $username
-echo -e "$user\n$user\n" | passwd $username
+echo -e "$username\n$username\n" | passwd $username
 addgroup $username wheel
 chmod 640 /etc/sudoers
 echo '
