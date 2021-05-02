@@ -1,0 +1,258 @@
+
+BEG(){
+echo 'update ----------------------------------------'
+sudo apk update
+echo 'upgrade ----------------------------------------'
+sudo apk upgrade
+}
+
+APK_ADD(){
+echo 'apkadd ----------------------------------------'
+sudo apk add sudo bash nano tree bash net-tools iptables wget curl procps zip unzip util-linux grep
+}
+
+##no
+ADDUSER(){
+
+#read -p "Type a username you want to add: " un
+#adduser -s /bin/bash -h /home/$un -D $un
+#echo -e "$un\n$un\n" | passwd $un
+#addgroup $un wheel
+addgroup bigred wheel
+#chmod 640 /etc/sudoers
+#echo '
+#%wheel ALL=(ALL) NOPASSWD: ALL
+#' | sudo tee -a /etc/sudoers
+nano /etc/sudoers
+}
+
+#no
+setup-0(){
+BEG
+sleep 0.5
+APK_ADD
+sleep 0.5
+#ADDUSER
+}
+
+
+CONF(){
+echo 'ip_forward & ipv6 ----------------------------------------'
+echo 'net.ipv4.ip_forward = 1
+net.ipv6.conf.all.disable_ipv6 = 1
+' | sudo tee -a /etc/sysctl.conf
+echo 'nameserver 8.8.8.8' | sudo tee -a /etc/resolv.conf
+}
+
+HOST(){
+read -p "Enter hostname: " hn
+echo -n "$hn" | sudo tee /etc/hostname
+
+echo "127.0.0.1	localhost
+ n1
+ r1
+ r2
+ r3
+ r4
+" | sudo tee /etc/hosts
+}
+
+AUTOLOGIN(){
+echo 'autologin ----------------------------------------'
+read -p "your username: " un
+echo "
+tty1::respawn:/sbin/agetty --autologin $un --noclear 38400 tty1
+" | sudo tee -a /etc/inittab
+sudo nano /etc/inittab
+}
+
+setup-1(){
+BEG
+sleep 0.5
+APK_ADD
+sleep 0.5
+CONF
+sleep 0.5
+HOST
+sleep 0.5
+AUTOLOGIN
+
+}
+
+setup-2(){
+sudo passwd bigred
+sudo passwd -dl root
+}
+
+
+#poweroff-----------------------------------
+
+
+
+ADDIP(){
+echo 'set ip ----------------------------------------'
+echo 'auto lo
+iface lo inet loopback
+' | sudo tee /etc/network/interfaces
+
+card=$(ls /sys/class/net)
+count=0
+for x in $card
+do
+
+[ $x != "lo" ]&&echo "this is $x!!!!!!!!! " || continue
+
+if [ $count = 0 ];then
+  read -p "Enter IP: " ip
+  read -p "Enter netmask (/number): " one
+  read -p "Enter gateway: " gw
+  echo "auto $x" | sudo tee -a /etc/network/interfaces
+  echo "iface $x inet static" | sudo tee -a /etc/network/interfaces
+  echo "	address $ip/$one" | sudo tee -a /etc/network/interfaces
+  echo "	gateway $gw" | sudo tee -a /etc/network/interfaces
+else
+
+  read -p "Enter IP: " ip
+  read -p "Enter netmask(/number): " one
+  echo "auto $x" | sudo tee -a /etc/network/interfaces
+  echo "iface $x inet static" | sudo tee -a /etc/network/interfaces
+  echo "	address $ip/$one" | sudo tee -a /etc/network/interfaces
+fi
+count=$((count+1))
+
+done
+}
+
+DHCP(){
+echo 'set dhcp ----------------------------------------'
+sudo apk add dhcp
+read -p "Enter netID: " dhcpnetid
+read -p "Enter netmask: " dhcpmask
+read -p "Enter router: " dhcprouter
+read -p "Enter range begin: " dhcpbeg
+read -p "Enter range end: " dhcpend
+#netid_beg=${dhcpnetid%.*}
+#netid_end=${dhcpnetid##*.}
+
+
+echo "subnet $dhcpnetid netmask $dhcpmask {
+  option domain-name \"right.io\";
+  option domain-name-servers 8.8.8.8;
+  option routers $dhcprouter;
+  range $dhcpbeg $dhcpend;
+}
+"| sudo tee /etc/dhcp/dhcpd.conf
+sudo rc-update add dhcpd
+sudo rc-service dhcpd start
+}
+
+ADDROUTE(){
+echo 'set routing table ----------------------------------------'
+sudo rm /etc/local.d/route_set.start
+while true
+do
+read -p "Destination netID: " netid
+read -p "Enter netmask (/number) " mask
+read -p "gateway: " gw
+if [ -f "/etc/local.d/route_set.start" ];then
+echo "route add -net $netid/$mask gw $gw
+" | sudo tee -a /etc/local.d/route_set.start
+else
+echo "route add -net $netid/$mask gw $gw
+" | sudo tee /etc/local.d/route_set.start
+fi
+
+read -p "end?(y/n) " end
+case $end in
+"y")
+ break
+;;
+*)
+ echo "continue!"
+;;
+esac
+done
+}
+
+CHROUTE(){
+sudo chmod 755 /etc/local.d/route_set.start
+sudo rc-update add local
+}
+
+#no
+PROXY(){
+sudo apk add squid
+sudo rc-service squid start
+sudo rc-update add squid
+echo "visible_hostname $hn" | sudo tee -a /etc/squid/squid.conf
+}
+
+IPTABLES(){
+echo 'set iptables ----------------------------------------'
+read -p "nat,netID: " natid
+read -p "/number? " natone
+echo "iptables -t nat -A POSTROUTING  ! -d $natid/$natone -o eth0 -j MASQUERADE
+" | sudo tee /etc/local.d/iptables.start
+sudo chmod +x /etc/local.d/iptables.start
+}
+
+
+setup-n1(){
+HOST
+ADDIP
+ADDROUTE
+CHROUTE
+#PROXY
+IPTABLES
+}
+
+
+setup-r1(){
+HOST
+ADDIP
+}
+
+setup-r2(){
+HOST
+ADDIP
+ADDROUTE
+CHROUTE
+}
+
+setup-r3(){
+HOST
+ADDIP
+ADDROUTE
+CHROUTE
+}
+
+setup-r4(){
+HOST
+ADDIP
+}
+
+
+showip(){
+card=$(ls /sys/class/net)
+for x in $card
+do
+ if [ $x != "lo" ];then
+  ips=$(ifconfig $x | grep "inet ")
+  IP=$(echo $ips | cut -d " " -f2 | cut -d ":" -f2)
+  echo "$x:$IP"
+ fi
+
+done
+echo
+}
+
+
+alias ping='ping -c 4'
+alias dir='ls -alh'
+alias reboot='sudo reboot'
+alias poweroff='sudo poweroff'
+alias ps='ps aux'
+
+clear
+
+showip
