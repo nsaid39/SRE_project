@@ -1,0 +1,4 @@
+apk add sudo nano
+addgroup bigred wheel
+nano /etc/sudoers
+reboot
